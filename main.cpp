@@ -43,7 +43,6 @@ int main() {
         BeginDrawing();
         ClearBackground(BLACK);
 
-        //DrawCircleV(pos, RADIUS, RED);
         DrawRectangleV(pos, size, YELLOW);
 
         DrawFPS(SCREEN_WIDTH - 90, 10);
