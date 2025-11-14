@@ -2,11 +2,11 @@
 #include <iostream>
 #include <cmath>
 #include <ctime>
+#include <string>
+#include "objetos.h"
 
 using namespace std;
 
-#define UP 0
-#define DOWN 1
 #define LEFT 2
 #define RIGHT 3
 
@@ -17,7 +17,7 @@ using namespace std;
 #define SPEED 250.0f
 
 int main() {
-    InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Movimentação Básica com Raylib");
+    InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Arkanoid");
     SetTargetFPS(60);
     
     Vector2 pos = {SCREEN_WIDTH / 2.0f, SCREEN_HEIGHT - 30.0f};

@@ -7,7 +7,6 @@ struct Paddle
 {
     Vector2 posicao;
     Vector2 tamanho;
-    float velocidade;
     int vidas;
     Color cor;
 
@@ -29,6 +28,10 @@ struct Bola
     Vector2 velocidade;
     Color cor;
 };
+
+void InitPaddle(Paddle &paddle, int screenWidth, int screenHeight, Color cor, int vidas = 5);
+Bloco* InitBlocos(int linhas, int qtd, int screenWidth, int screenHeight, Vector2 tamanho, int vidas = 1);
+void InitBola(Bola &bola, Paddle &paddle, float raio, Vector2 velocidade, Color cor);
 
 
 
