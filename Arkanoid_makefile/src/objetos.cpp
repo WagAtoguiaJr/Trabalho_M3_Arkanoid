@@ -4,41 +4,33 @@
 
 
 
-void InitPaddle(Paddle &paddle, int screenWidth, int screenHeight, Color cor, int vidas = 5)
+void InicPaddle(Paddle &paddle, int screenWidth, int screenHeight, int vidas)
 {
     paddle.posicao = (Vector2) {(screenWidth / 2.0f), (screenHeight * 7.0f / 8.0f)};
-    paddle.tamanho = (Vector2) {screenHeight/10.0f, 20.0f};
+    paddle.tamanho = (Vector2) {screenWidth/10.0f, 20.0f};
     paddle.vidas = vidas;
-    paddle.cor = cor;
 }
-Bloco* InitBlocos(int linhas, int qtd, int screenWidth, int screenHeight, Vector2 tamanho, int vidas = 1)
+Bloco** InicBlocos(int linhas, int qtd, int screenWidth, int screenHeight, Vector2 tamanho, int vidas)
 {
-    Bloco* blocos = new Bloco[linhas * qtd];
+    Bloco** blocos = new Bloco*[linhas];
     for (int i = 0; i < linhas; i++)
     {
+        blocos[i] = new Bloco[qtd];
         for (int j = 0; j < qtd; j++)
         {
-            int index = i * qtd + j;
-            blocos[index].posicao = { j * (tamanho.x + 5) + 35, i * (tamanho.y + 5) + 50 };
-            blocos[index].tamanho = tamanho;
-            if (i % 3 == 0)
-                blocos[index].cor = RED;
-            else if (i % 3 == 1)
-                blocos[index].cor = GREEN;
-            else
-                blocos[index].cor = BLUE;
-            blocos[index].ativo = true;
-            blocos[index].vidas = vidas;
+            blocos[i][j].posicao = (Vector2){j*tamanho.x + tamanho.x/2, i*tamanho.y + 50 + tamanho.y/2};
+            blocos[i][j].tamanho = tamanho;
+            blocos[i][j].ativo = true;
+            blocos[i][j].vidas = vidas;
         }
     }
     
     return blocos;
 }
-void InitBola(Bola &bola, Paddle &paddle, float raio, Vector2 velocidade, Color cor)
+void InicBola(Bola &bola, Paddle &paddle, float raio)
 {
-
     bola.posicao = (Vector2) {paddle.posicao.x + paddle.tamanho.x / 2.0f, paddle.posicao.y - raio - 1.0f};
     bola.raio = raio;
-    bola.velocidade = velocidade;
-    bola.cor = cor;
+    bola.velocidade = (Vector2) {0, 0};
+    bola.ativo = false;
 }
