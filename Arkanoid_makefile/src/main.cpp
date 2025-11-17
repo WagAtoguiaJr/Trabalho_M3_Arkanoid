@@ -243,9 +243,7 @@ void DesenharJogo()
             DrawText("Pressione ENTER para reiniciar", GetScreenWidth() / 2 - MeasureText("Pressione ENTER para reiniciar", 20) / 2, GetScreenHeight() / 2 + 30, 20, WHITE);
         }
     }
-
     
-
     EndDrawing();
 }
 
@@ -264,6 +262,7 @@ void DescarregarJogo()
     }
     delete[] blocos;
 }
+
 
 int main() {
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Arkanoid");
