@@ -2,14 +2,13 @@
 #include "raylib.h"
 #include <cstdlib>
 
-
-
 void InicPaddle(Paddle &paddle, int screenWidth, int screenHeight, int vidas)
 {
     paddle.posicao = (Vector2) {(screenWidth / 2.0f), (screenHeight * 7.0f / 8.0f)};
     paddle.tamanho = (Vector2) {screenWidth/10.0f, 20.0f};
-    paddle.vidas = vidas;
+    paddle.velocidade = 5.0f;
 }
+
 Bloco** InicBlocos(int linhas, int qtd, int screenWidth, int screenHeight, Vector2 tamanho, int vidas)
 {
     Bloco** blocos = new Bloco*[linhas];
@@ -22,9 +21,9 @@ Bloco** InicBlocos(int linhas, int qtd, int screenWidth, int screenHeight, Vecto
             blocos[i][j].tamanho = tamanho;
             blocos[i][j].ativo = true;
             blocos[i][j].vidas = vidas;
-            blocos[i][j].cor = BLUE;
             blocos[i][j].lifePowerUp = false;
             blocos[i][j].sizePowerUp = false;
+            blocos[i][j].velocPowerUp = false;
         }
     }
     
@@ -39,10 +38,9 @@ void SetLifePowerUp(Bloco** blocos, int linhas, int qtd, int powerUps)
     int randomColuna = rand() % qtd;
     Bloco &b = blocos[randomLinha][randomColuna];
     
-    if (b.ativo && !b.lifePowerUp && !b.sizePowerUp)
+    if (b.ativo && !b.lifePowerUp && !b.sizePowerUp && !b.velocPowerUp)
     {
         b.lifePowerUp = true;
-        b.cor = GOLD;
     }
     else
     {
@@ -60,10 +58,9 @@ void SetSizePowerUp(Bloco** blocos, int linhas, int qtd, int powerUps)
     int randomColuna = rand() % qtd;
     Bloco &b = blocos[randomLinha][randomColuna];
     
-    if (b.ativo && !b.sizePowerUp && !b.lifePowerUp)
+    if (b.ativo && !b.sizePowerUp && !b.lifePowerUp && !b.velocPowerUp)
     {
         b.sizePowerUp = true;
-        b.cor = GREEN;
     }
     else
     {
@@ -71,6 +68,26 @@ void SetSizePowerUp(Bloco** blocos, int linhas, int qtd, int powerUps)
     }
 
    SetSizePowerUp(blocos, linhas, qtd, powerUps - 1);
+}
+
+void SetVelocPowerUp(Bloco** blocos, int linhas, int qtd, int powerUps)
+{
+    if (powerUps == 0) return;
+    
+    int randomLinha = rand() % linhas;
+    int randomColuna = rand() % qtd;
+    Bloco &b = blocos[randomLinha][randomColuna];
+    
+    if (b.ativo && !b.velocPowerUp && !b.sizePowerUp && !b.lifePowerUp)
+    {
+        b.velocPowerUp = true;
+    }
+    else
+    {
+        SetVelocPowerUp(blocos, linhas, qtd, powerUps);
+    }
+
+   SetVelocPowerUp(blocos, linhas, qtd, powerUps - 1);
 }
 
 void InicBola(Bola &bola, Paddle &paddle, float raio)

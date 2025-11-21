@@ -21,18 +21,51 @@ static bool vitoria = false;
 // TODO: STRUCT COM AREA DE JOGO
 
 Paddle paddle;
+int vidasPaddle = 3;
+int fases = 1;
 Bola bola;
 Bloco** blocos;
-
 Vector2 tamanhoBloco;
+
+int mutatorVelocBola = 1.99f; 
 
 void InicializarJogo()
 {
+    int resistenciaBloco = 1;
+    int qtdPowerUpsLife = 3;
+    int qtdPowerUpsSize = 2;
+    int qtdPowerUpsVeloc = 2;
+
+    switch (fases)
+    {
+    case 1:
+        resistenciaBloco = 1;
+        qtdPowerUpsLife = 3;
+        qtdPowerUpsSize = 2;
+        qtdPowerUpsVeloc = 2;
+        break;
+    case 2:
+        resistenciaBloco = 2;
+        qtdPowerUpsLife = 2;
+        qtdPowerUpsSize = 1;
+        qtdPowerUpsVeloc = 2;
+        break;
+    case 3:
+        resistenciaBloco = 3;
+        qtdPowerUpsLife = 1;
+        qtdPowerUpsSize = 1;
+        qtdPowerUpsVeloc = 1;
+        break;
+    default:
+        break;
+    }
+
     tamanhoBloco = (Vector2) {GetScreenWidth() / BLOCOS_COLUNAS, 40};
-    InicPaddle(paddle, GetScreenWidth(), GetScreenHeight());
-    blocos = InicBlocos(BLOCOS_LINHAS, BLOCOS_COLUNAS, GetScreenWidth(), GetScreenHeight(), tamanhoBloco);
-    SetLifePowerUp(blocos, BLOCOS_LINHAS, BLOCOS_COLUNAS, 3);
-    SetSizePowerUp(blocos, BLOCOS_LINHAS, BLOCOS_COLUNAS, 2);
+    InicPaddle(paddle, GetScreenWidth(), GetScreenHeight(), vidasPaddle);
+    blocos = InicBlocos(BLOCOS_LINHAS, BLOCOS_COLUNAS, GetScreenWidth(), GetScreenHeight(), tamanhoBloco, resistenciaBloco);
+    SetLifePowerUp(blocos, BLOCOS_LINHAS, BLOCOS_COLUNAS, qtdPowerUpsLife);
+    SetSizePowerUp(blocos, BLOCOS_LINHAS, BLOCOS_COLUNAS, qtdPowerUpsSize);
+    SetVelocPowerUp(blocos, BLOCOS_LINHAS, BLOCOS_COLUNAS, qtdPowerUpsVeloc);
     InicBola(bola, paddle, RAIO);
 }
 
@@ -45,7 +78,7 @@ void ColisaoBolaPaddle()
 
     if (CheckCollisionCircleRec(bolaCentro, bola.raio, paddleRect))
     {
-        bola.velocidade.y *= -1;
+        bola.velocidade.y *= -1.0f;
         float distancia = bola.posicao.x - paddle.posicao.x;
         float porcentagem = distancia / (paddle.tamanho.x / 2);
         bola.velocidade.x = porcentagem * 5.0f;
@@ -83,14 +116,24 @@ void ColisaoBolaBlocos()
             if (sobreposX > 0.0f && sobreposY > 0.0f)
             {
                 // Destrói o bloco
-                b.ativo = false;
-                if(b.lifePowerUp)
+                b.vidas--;
+
+                if (b.vidas <= 0)
                 {
-                    paddle.vidas++;
-                }
-                if(b.sizePowerUp)
-                {
-                    paddle.tamanho.x *= 1.2f;
+                    b.ativo = false;
+
+                    if(b.lifePowerUp)
+                    {
+                        vidasPaddle++;
+                    }
+                    if(b.sizePowerUp)
+                    {
+                        paddle.tamanho.x *= 1.2f;
+                    }
+                    if(b.velocPowerUp)
+                    {
+                        paddle.velocidade *= 1.2f;
+                    }
                 }
 
                 // Reflete a velocidade com base na menor penetração (eixo de colisão principal)
@@ -125,15 +168,24 @@ void ColisaoBolaParedes()
     }
     if (bola.posicao.y + bola.raio >= GetScreenHeight())
     {
-        paddle.vidas--;
+        vidasPaddle--;
         bola.ativo = false;
         bola.posicao = (Vector2) {paddle.posicao.x + paddle.tamanho.x / 2.0f, paddle.posicao.y - bola.raio - 1.0f};
         bola.velocidade = (Vector2) {0, 0};
-        if (paddle.vidas <= 0)
+        if (vidasPaddle <= 0)
         {
             gameOver = true;
         }
     }
+}
+
+void DescarregarJogo()
+{
+    for (int i = 0; i < BLOCOS_LINHAS; i++)
+    {
+        free(blocos[i]);
+    }
+    free(blocos);
 }
 
 void AtualizarJogo()
@@ -144,9 +196,9 @@ void AtualizarJogo()
 
         if (!pause)
         {
-            if(IsKeyDown(KEY_LEFT)) paddle.posicao.x -= 5.0f;
+            if(IsKeyDown(KEY_LEFT)) paddle.posicao.x -= paddle.velocidade;
             if((paddle.posicao.x - paddle.tamanho.x/2) <= 0) paddle.posicao.x = paddle.tamanho.x/2;
-            if(IsKeyDown(KEY_RIGHT)) paddle.posicao.x += 5.0f;
+            if(IsKeyDown(KEY_RIGHT)) paddle.posicao.x += paddle.velocidade;
             if((paddle.posicao.x + paddle.tamanho.x/2) >= GetScreenWidth()) paddle.posicao.x = GetScreenWidth() - paddle.tamanho.x/2;
 
             if(!bola.ativo && IsKeyPressed(KEY_SPACE))
@@ -156,8 +208,8 @@ void AtualizarJogo()
             }
 
             if(bola.ativo){
-                    bola.posicao.x += bola.velocidade.x;
-                    bola.posicao.y += bola.velocidade.y;
+                    bola.posicao.x += bola.velocidade.x * mutatorVelocBola;
+                    bola.posicao.y += bola.velocidade.y * mutatorVelocBola;
                 
             }else{
                     bola.posicao = (Vector2) {paddle.posicao.x, paddle.posicao.y - paddle.tamanho.y/2 - bola.raio - 1.0f};
@@ -167,7 +219,7 @@ void AtualizarJogo()
             ColisaoBolaBlocos();
             ColisaoBolaParedes();
            
-            if (paddle.vidas <= 0)
+            if (vidasPaddle <= 0)
             {
                 gameOver = true;
             }else{
@@ -195,12 +247,22 @@ void AtualizarJogo()
 
         }
     } else {
-        if (IsKeyPressed(KEY_ENTER))
-        {
-            InicializarJogo();
-            gameOver = false;
-            vitoria = false;
-        }
+       if (vitoria && IsKeyPressed(KEY_ENTER))
+       {
+           fases++;
+           DescarregarJogo();
+           InicializarJogo();
+           gameOver = false;
+           vitoria = false;
+
+       } else if (!vitoria && IsKeyPressed(KEY_ENTER))
+       {
+           fases = 1;
+           gameOver = false;
+           vidasPaddle = 3;
+           DescarregarJogo();
+           InicializarJogo();
+       }
     }
 }
 
@@ -224,12 +286,32 @@ void DesenharJogo()
                 Bloco &b = blocos[i][j];
                 if (b.ativo)
                 {
-                    DrawRectangleV((Vector2){b.posicao.x - b.tamanho.x / 2, b.posicao.y - b.tamanho.y / 2}, b.tamanho, b.cor);
+                    if (b.vidas == 3)
+                        DrawRectangleV((Vector2){b.posicao.x - b.tamanho.x / 2, b.posicao.y - b.tamanho.y / 2}, b.tamanho, RED);
+                    else if (b.vidas == 2)
+                        DrawRectangleV((Vector2){b.posicao.x - b.tamanho.x / 2, b.posicao.y - b.tamanho.y / 2}, b.tamanho, ORANGE);
+                    else
+                        DrawRectangleV((Vector2){b.posicao.x - b.tamanho.x / 2, b.posicao.y - b.tamanho.y / 2}, b.tamanho, YELLOW);
+                    
+                    if (b.lifePowerUp)
+                    {
+                        DrawText("L", b.posicao.x - 5, b.posicao.y - 10, 20, BLACK);
+                    }
+                    else if (b.sizePowerUp)
+                    {
+                        DrawText("S", b.posicao.x - 5, b.posicao.y - 10, 20, BLACK);
+                    }
+                    else if (b.velocPowerUp)
+                    {
+                        DrawText("V", b.posicao.x - 5, b.posicao.y - 10, 20, BLACK);
+                    }
+
+                    DrawRectangleLines(b.posicao.x - b.tamanho.x / 2, b.posicao.y - b.tamanho.y / 2, b.tamanho.x, b.tamanho.y, BLACK);
                 }
             }
         }
 
-        DrawText(("Vidas: " + to_string(paddle.vidas)).c_str(), 10, 10, 20, WHITE);
+        DrawText(("Vidas: " + to_string(vidasPaddle)).c_str(), 10, 10, 20, WHITE);
 
         if (pause)
         {
@@ -241,7 +323,7 @@ void DesenharJogo()
         if (vitoria)
         {
             DrawText("VOCÊ VENCEU!", GetScreenWidth() / 2 - MeasureText("VOCÊ VENCEU!", 40) / 2, GetScreenHeight() / 2 - 20, 40, GREEN);
-            DrawText("Pressione ENTER para reiniciar", GetScreenWidth() / 2 - MeasureText("Pressione ENTER para reiniciar", 20) / 2, GetScreenHeight() / 2 + 30, 20, WHITE);
+            DrawText("Pressione ENTER para a próxima fase", GetScreenWidth() / 2 - MeasureText("Pressione ENTER para a próxima fase", 20) / 2, GetScreenHeight() / 2 + 30, 20, WHITE);
         }
         else
         {
@@ -259,20 +341,11 @@ void RenderizarJogo()
     DesenharJogo();
 }
 
-void DescarregarJogo()
-{
-    int linhas = BLOCOS_LINHAS;
-    for (int i = 0; i < linhas; i++)
-    {
-        delete[] blocos[i];
-    }
-    delete[] blocos;
-}
-
 
 int main() {
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Arkanoid");
     SetTargetFPS(60);
+    
     InicializarJogo();
 
     while (!WindowShouldClose())
