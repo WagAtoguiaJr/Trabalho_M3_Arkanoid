@@ -22,11 +22,57 @@ Bloco** InicBlocos(int linhas, int qtd, int screenWidth, int screenHeight, Vecto
             blocos[i][j].tamanho = tamanho;
             blocos[i][j].ativo = true;
             blocos[i][j].vidas = vidas;
+            blocos[i][j].cor = BLUE;
+            blocos[i][j].lifePowerUp = false;
+            blocos[i][j].sizePowerUp = false;
         }
     }
     
     return blocos;
 }
+
+void SetLifePowerUp(Bloco** blocos, int linhas, int qtd, int powerUps)
+{
+    if (powerUps == 0) return;
+
+    int randomLinha = rand() % linhas;
+    int randomColuna = rand() % qtd;
+    Bloco &b = blocos[randomLinha][randomColuna];
+    
+    if (b.ativo && !b.lifePowerUp && !b.sizePowerUp)
+    {
+        b.lifePowerUp = true;
+        b.cor = GOLD;
+    }
+    else
+    {
+        SetLifePowerUp(blocos, linhas, qtd, powerUps);
+    }
+
+    SetLifePowerUp(blocos, linhas, qtd, powerUps - 1);
+}
+
+void SetSizePowerUp(Bloco** blocos, int linhas, int qtd, int powerUps)
+{
+    if (powerUps == 0) return;
+    
+    int randomLinha = rand() % linhas;
+    int randomColuna = rand() % qtd;
+    Bloco &b = blocos[randomLinha][randomColuna];
+    
+    if (b.ativo && !b.sizePowerUp && !b.lifePowerUp)
+    {
+        b.sizePowerUp = true;
+        b.cor = GREEN;
+    }
+    else
+    {
+        SetSizePowerUp(blocos, linhas, qtd, powerUps);
+    }
+
+   SetSizePowerUp(blocos, linhas, qtd, powerUps - 1);
+}
+
 void InicBola(Bola &bola, Paddle &paddle, float raio)
 {
     bola.posicao = (Vector2) {paddle.posicao.x + paddle.tamanho.x / 2.0f, paddle.posicao.y - raio - 1.0f};

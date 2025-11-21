@@ -8,7 +8,6 @@ struct Paddle
     Vector2 posicao;
     Vector2 tamanho;
     int vidas;
-
 };
 
 struct Bloco
@@ -17,6 +16,9 @@ struct Bloco
     Vector2 tamanho;
     bool ativo;
     int vidas;
+    Color cor;
+    bool lifePowerUp;
+    bool sizePowerUp;
 };
 
 struct Bola
@@ -27,8 +29,10 @@ struct Bola
     bool ativo;
 };
 
-void InicPaddle(Paddle &paddle, int screenWidth, int screenHeight, int vidas = 5);
+void InicPaddle(Paddle &paddle, int screenWidth, int screenHeight, int vidas = 3);
 Bloco** InicBlocos(int linhas, int qtd, int screenWidth, int screenHeight, Vector2 tamanho, int vidas = 1);
+void SetLifePowerUp(Bloco** blocos, int linhas, int qtd, int powerUps);
+void SetSizePowerUp(Bloco** blocos, int linhas, int qtd, int powerUps);
 void InicBola(Bola &bola, Paddle &paddle, float raio);
 
 

@@ -7,19 +7,18 @@
 
 using namespace std;
 
-#define LEFT 2
-#define RIGHT 3
-
 #define SCREEN_WIDTH  800 
 #define  SCREEN_HEIGHT 450
 
 #define RAIO 7.0f
-#define BLOCOS_COLUNAS 5
-#define BLOCOS_LINHAS 1
+#define BLOCOS_COLUNAS 10
+#define BLOCOS_LINHAS 3
 
 static bool gameOver = false;
 static bool pause = false;
 static bool vitoria = false;
+
+// TODO: STRUCT COM AREA DE JOGO
 
 Paddle paddle;
 Bola bola;
@@ -32,6 +31,8 @@ void InicializarJogo()
     tamanhoBloco = (Vector2) {GetScreenWidth() / BLOCOS_COLUNAS, 40};
     InicPaddle(paddle, GetScreenWidth(), GetScreenHeight());
     blocos = InicBlocos(BLOCOS_LINHAS, BLOCOS_COLUNAS, GetScreenWidth(), GetScreenHeight(), tamanhoBloco);
+    SetLifePowerUp(blocos, BLOCOS_LINHAS, BLOCOS_COLUNAS, 3);
+    SetSizePowerUp(blocos, BLOCOS_LINHAS, BLOCOS_COLUNAS, 2);
     InicBola(bola, paddle, RAIO);
 }
 
@@ -83,6 +84,14 @@ void ColisaoBolaBlocos()
             {
                 // Destrói o bloco
                 b.ativo = false;
+                if(b.lifePowerUp)
+                {
+                    paddle.vidas++;
+                }
+                if(b.sizePowerUp)
+                {
+                    paddle.tamanho.x *= 1.2f;
+                }
 
                 // Reflete a velocidade com base na menor penetração (eixo de colisão principal)
                 if (sobreposX < sobreposY)
@@ -215,10 +224,7 @@ void DesenharJogo()
                 Bloco &b = blocos[i][j];
                 if (b.ativo)
                 {
-                    if(j % 2 == 0)
-                        DrawRectangle(b.posicao.x - b.tamanho.x/2, b.posicao.y - b.tamanho.y/2, b.tamanho.x, b.tamanho.y, BLUE);
-                    else
-                        DrawRectangle(b.posicao.x - b.tamanho.x/2, b.posicao.y - b.tamanho.y/2, b.tamanho.x, b.tamanho.y, RED);
+                    DrawRectangleV((Vector2){b.posicao.x - b.tamanho.x / 2, b.posicao.y - b.tamanho.y / 2}, b.tamanho, b.cor);
                 }
             }
         }
@@ -255,7 +261,7 @@ void RenderizarJogo()
 
 void DescarregarJogo()
 {
-    int linhas = (int)BLOCOS_LINHAS;
+    int linhas = BLOCOS_LINHAS;
     for (int i = 0; i < linhas; i++)
     {
         delete[] blocos[i];
