@@ -41,6 +41,7 @@ void SetLifePowerUp(Bloco** blocos, int linhas, int qtd, int powerUps)
     if (b.ativo && !b.lifePowerUp && !b.sizePowerUp && !b.velocPowerUp)
     {
         b.lifePowerUp = true;
+        b.vidas = 1;
     }
     else
     {
@@ -61,6 +62,7 @@ void SetSizePowerUp(Bloco** blocos, int linhas, int qtd, int powerUps)
     if (b.ativo && !b.sizePowerUp && !b.lifePowerUp && !b.velocPowerUp)
     {
         b.sizePowerUp = true;
+        b.vidas = 1;
     }
     else
     {
@@ -81,6 +83,7 @@ void SetVelocPowerUp(Bloco** blocos, int linhas, int qtd, int powerUps)
     if (b.ativo && !b.velocPowerUp && !b.sizePowerUp && !b.lifePowerUp)
     {
         b.velocPowerUp = true;
+        b.vidas = 1;
     }
     else
     {

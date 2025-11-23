@@ -1,7 +1,7 @@
-#include "raylib.h"
-
 #ifndef OBJETOS_H
 #define OBJETOS_H
+
+#include "raylib.h"
 
 struct Paddle
 {
