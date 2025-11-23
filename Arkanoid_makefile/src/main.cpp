@@ -6,6 +6,7 @@
 #include "objetos.h"
 #include "audio.h"
 #include "menu.h"
+#include "ranking.h"
 
 using namespace std;
 
@@ -27,9 +28,17 @@ Bola bola;
 Bloco** blocos = nullptr;
 Vector2 tamanhoBloco;
 
-float modVelocBola = 1.25f; 
+static int blocosDestruidosFase = 0;
+static int fasePoints = 0;
+static int currentDifficultyIndex = 0;
+static float difficultyMultiplier = 1.0f;
+static int currentScore = 0;
+
+float modVelocBola = 1.0f; 
 
 // Flags auxiliares
+static bool scoreSaved = false;
+static string inputPlayerName = "";
 static bool gameOver = false;
 static bool pauseGame = false;
 static bool vitoria = false;
@@ -37,6 +46,7 @@ static bool vitoria = false;
 // Protótipos locais
 void InicializarJogo();
 void DescarregarJogo();
+void CalculaPontuacao();
 void ColisaoBolaPaddle();
 void ColisaoBolaBlocos();
 void ColisaoBolaParedes();
@@ -44,8 +54,180 @@ void AtualizarJogo();
 void DesenharJogo();
 void RenderizarJogo();
 
+
+int main() {
+    InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Arkanoid");
+    SetTargetFPS(60);
+
+    // Inicializa áudio e assets
+    InitAudioSystem();
+    LoadAudioAssets();
+
+    // Inicializa menu
+    InitMenu();
+
+    bool shouldStartGame = false;
+
+    while (!WindowShouldClose())
+    {
+        switch (state) {
+            case MENU:
+                UpdateMenu(state, fases, shouldStartGame);
+                DrawMenu();
+                if (shouldStartGame) {
+                    // inicia jogo com a dificuldade selecionada
+                    InicializarJogo();
+                    shouldStartGame = false;
+                }
+                break;
+
+            case PLAYING:
+                UpdateAudio(); // atualiza stream de música
+                RenderizarJogo();
+                if (gameOver) {
+                    state = GAMEOVER;
+                    currentScore = currentScore + fasePoints;
+                }
+                break;
+
+            case CONTROLS:
+                DrawControlsScreen();    
+                if (IsKeyPressed(KEY_B)) state = MENU;
+                
+                break;
+            
+            case RANKING:
+                DrawRankingScreen();
+                if (IsKeyPressed(KEY_B)) state = MENU;
+                break;
+
+            case GAMEOVER:
+            {
+                bool allowSave = (!vitoria) || (vitoria && fases >= 3);
+                DrawGameOverScreen(vitoria, allowSave, scoreSaved, inputPlayerName);
+                if (allowSave) {
+                    if (!scoreSaved) {
+                        // captura caracteres digitados
+                        int key = GetKeyPressed();
+                        while (key > 0) {
+                            int c = key;
+                            if ((c >= 32) && (c <= 126) && inputPlayerName.size() < 20) {
+                                inputPlayerName.push_back((char)c);
+                            }
+                            key = GetKeyPressed();
+                        }
+                        if (IsKeyPressed(KEY_BACKSPACE) && !inputPlayerName.empty()) {
+                            inputPlayerName.pop_back();
+                        }
+
+                        if (IsKeyPressed(KEY_ENTER)) {
+                            if (inputPlayerName.empty()) inputPlayerName = "PLAYER";
+
+                            // obtém data atual YYYY-MM-DD
+                            time_t t = time(nullptr);
+                            struct tm *ptm = localtime(&t); // precisa <ctime>
+                            char dateBuf[16];
+                            if (ptm) {
+                                strftime(dateBuf, sizeof(dateBuf), "%Y-%m-%d", ptm);
+                            }
+
+                            RankEntry entry;
+                            entry.date = dateBuf;
+                            entry.name = inputPlayerName;
+                            entry.score = currentScore;
+                            entry.difficulty = currentDifficultyIndex;
+
+                            AppendRankingCSV("rank/ranking.csv", entry);
+                            scoreSaved = true;
+                        }
+
+                        if (IsKeyPressed(KEY_B)) {
+                            // volta ao menu sem salvar
+                            DescarregarJogo();
+                            state = MENU;
+                            scoreSaved = false;
+                            inputPlayerName.clear();
+                            // reset counters para evitar reaparecer gameover
+                            currentScore = 0;
+                        }
+                    } else {
+                        if (IsKeyPressed(KEY_ENTER)) {
+                            
+                            cout << "Teste de Reset Apos Save - Entrou" << endl;
+                            
+                            fases = 1; 
+                            vidasPaddle = 3; 
+                            currentScore = 0;
+
+                            cout << "Teste de Reset Apos Save - Resetou" << endl;
+
+                            DescarregarJogo();
+                            InicializarJogo();
+                            scoreSaved = false;
+                            inputPlayerName.clear();
+                            state = PLAYING;
+                        }
+
+                        if (IsKeyPressed(KEY_B)) {
+                            
+                            cout << "Teste de Reset Apos Save - Entrou" << endl;
+                            
+                            fases = 1; 
+                            vidasPaddle = 3; 
+                            currentScore = 0;
+
+                            cout << "Teste de Reset Apos Save - Resetou" << endl;
+                            
+                            DescarregarJogo();
+                            state = MENU;
+                            scoreSaved = false;
+                            inputPlayerName.clear();
+                            currentScore = 0;
+                        }
+                    }
+                } else {
+                    if (IsKeyPressed(KEY_ENTER)) {
+                        // avança para próxima fase (sem salvar)
+                        fases++;
+                        DescarregarJogo();
+                        InicializarJogo();
+                        state = PLAYING;
+                    }
+                    if (IsKeyPressed(KEY_B)) {
+                        DescarregarJogo();
+                        state = MENU;
+                        fases = 1; 
+                        vidasPaddle = 3; 
+                        currentScore = 0;
+                    }
+                }
+            }
+                break;
+
+            default:
+                state = MENU;
+                break;
+        }
+    }
+
+    // limpeza
+    DescarregarJogo();
+    UnloadAudioSystem();
+    CloseWindow();
+    return 0;
+}
+
 void InicializarJogo()
 {
+    
+    gameOver = false;
+    vitoria = false;
+    pauseGame = false;
+    scoreSaved = false;
+    inputPlayerName.clear();
+    blocosDestruidosFase = 0;
+    fasePoints = 0;
+
     // garante descarregar blocos anteriores se existirem
     if (blocos != nullptr) {
         DescarregarJogo();
@@ -87,19 +269,17 @@ void InicializarJogo()
     SetSizePowerUp(blocos, BLOCOS_LINHAS, BLOCOS_COLUNAS, qtdPowerUpsSize);
     SetVelocPowerUp(blocos, BLOCOS_LINHAS, BLOCOS_COLUNAS, qtdPowerUpsVeloc);
     InicBola(bola, paddle, RAIO);
+    bola.ativo = false;
+    bola.velocidade = (Vector2){0.0f, 0.0f};
 
     // aplica dificuldade selecionada no menu
-    int diff = GetMenuDifficulty();
-    switch (diff) {
-        case 0: modVelocBola = 1.0f; break;
-        case 1: modVelocBola = 1.25f; break;
-        case 2: modVelocBola = 1.5f; break;
-        default: modVelocBola = 1.0f; break;
+    currentDifficultyIndex = GetMenuDifficulty();
+    switch (currentDifficultyIndex) {
+        case 0: modVelocBola = difficultyMultiplier = 1.0f; break;
+        case 1: modVelocBola = difficultyMultiplier = 1.25f; break;
+        case 2: modVelocBola = difficultyMultiplier =  1.5f; break;
+        default: modVelocBola = difficultyMultiplier = 1.0f; break;
     }
-
-    gameOver = false;
-    pauseGame = false;
-    vitoria = false;
 }
 
 void ColisaoBolaPaddle()
@@ -160,6 +340,9 @@ void ColisaoBolaBlocos()
                 {
                     b.ativo = false;
                     PlayBlockDestroySound();
+
+                    blocosDestruidosFase++;
+                    CalculaPontuacao();
 
                     if(b.lifePowerUp)
                     {
@@ -235,6 +418,11 @@ void DescarregarJogo()
     }
     free(blocos);
     blocos = nullptr;
+}
+
+void CalculaPontuacao()
+{
+    fasePoints = (int) roundf((blocosDestruidosFase * 10) * (float) fases * difficultyMultiplier);
 }
 
 void AtualizarJogo()
@@ -343,6 +531,7 @@ void DesenharJogo()
         }
 
         DrawText(("Vidas: " + to_string(vidasPaddle)).c_str(), 10, 10, 20, WHITE);
+        DrawText(("Score: " + to_string(currentScore + fasePoints)).c_str(), GetScreenWidth() - 200, 10, 20, WHITE);
 
         if (pauseGame)
         {
@@ -361,83 +550,4 @@ void RenderizarJogo()
 {
     AtualizarJogo();
     DesenharJogo();
-}
-
-int main() {
-    InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Arkanoid");
-    SetTargetFPS(60);
-
-    // Inicializa áudio e assets
-    InitAudioSystem();
-    LoadAudioAssets();
-
-    // Inicializa menu
-    InitMenu();
-
-    bool shouldStartGame = false;
-
-    while (!WindowShouldClose())
-    {
-        switch (state) {
-            case MENU:
-                UpdateMenu(state, fases, shouldStartGame);
-                DrawMenu();
-                if (shouldStartGame) {
-                    // inicia jogo com a dificuldade selecionada
-                    InicializarJogo();
-                    shouldStartGame = false;
-                }
-                break;
-
-            case PLAYING:
-                UpdateAudio(); // atualiza stream de música
-                RenderizarJogo();
-                if (gameOver) {
-                    state = GAMEOVER;
-                }
-                break;
-
-            case CONTROLS:
-                if (IsKeyPressed(KEY_B)) state = MENU;
-                DrawControlsScreen();
-                break;
-
-            case GAMEOVER:
-                DrawGameOverScreen(vitoria);
-                if (IsKeyPressed(KEY_ENTER)) {
-                    if (vitoria) {
-                        fases++;
-                    } else {
-                        fases = 1;
-                        vidasPaddle = 3;
-                    }
-                    DescarregarJogo();
-                    InicializarJogo();
-                    gameOver = false;
-                    vitoria = false;
-                    state = PLAYING;
-                }
-                if (IsKeyPressed(KEY_B) && !vitoria) {
-                    // volta ao menu sem reiniciar
-                    DescarregarJogo();
-                    InicializarJogo();
-                    fases = 1;
-                    vidasPaddle = 3;
-                    gameOver = false;
-                    vitoria = false;
-                    state = MENU;
-                }
-                break;
-
-            default:
-                state = MENU;
-                break;
-        }
-    }
-
-    // limpeza
-    DescarregarJogo();
-    UnloadAudioSystem();
-    CloseWindow();
-    return 0;
 }

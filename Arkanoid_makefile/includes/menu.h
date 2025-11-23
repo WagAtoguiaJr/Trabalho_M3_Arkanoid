@@ -3,7 +3,9 @@
 
 #include "raylib.h"
 #include <string>
-#include <vector>
+#include <ctime>
+
+using namespace std;
 
 // Estados do jogo (compartilhados com main)
 enum GameState { MENU, PLAYING, RANKING, CONTROLS, PAUSED, GAMEOVER };
@@ -21,10 +23,12 @@ void DrawMenu();
 void DrawControlsScreen();
 
 // Desenha tela de gameover (simples)
-void DrawGameOverScreen(bool vitoria);
+void DrawGameOverScreen(const bool &vitoria, const bool &allowSave, const bool &scoreSaved, const string &inputPlayerName);
 
 // Ajusta dificuldade (0=Fácil,1=Médio,2=Difícil)
 void SetMenuDifficulty(int diff);
+
 int GetMenuDifficulty();
+
 
 #endif // MENU_H
