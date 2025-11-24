@@ -29,22 +29,11 @@ struct Bola
     bool ativo;
 };
 
-void InicPaddle(Paddle &paddle, int screenWidth, int screenHeight, int vidas = 3);
-Bloco** InicBlocos(int linhas, int qtd, int screenWidth, int screenHeight, Vector2 tamanho, int vidas = 1);
+void InicPaddle(Paddle &paddle, const Rectangle &playfield, int vidas);
+Bloco** InicBlocos(int linhas, int qtd, const Rectangle &playfield , Vector2 tamanho, int vidas);
 void SetLifePowerUp(Bloco** blocos, int linhas, int qtd, int powerUps);
 void SetSizePowerUp(Bloco** blocos, int linhas, int qtd, int powerUps);
 void SetVelocPowerUp(Bloco** blocos, int linhas, int qtd, int powerUps);
 void InicBola(Bola &bola, Paddle &paddle, float raio);
-
-
-
-
-
-
-
-
-
-
-
 
 #endif // OBJETOS_H

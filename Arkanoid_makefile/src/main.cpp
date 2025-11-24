@@ -3,6 +3,8 @@
 #include <cmath>
 #include <ctime>
 #include <string>
+#include <algorithm>
+
 #include "objetos.h"
 #include "audio.h"
 #include "menu.h"
@@ -16,6 +18,9 @@ using namespace std;
 #define RAIO 7.0f
 #define BLOCOS_COLUNAS 10
 #define BLOCOS_LINHAS 3
+
+// Playfield: área onde bola, blocos e paddle existem
+static Rectangle playfield = { 60.0f, 80.0f, SCREEN_WIDTH - 120.0f, SCREEN_HEIGHT - 160.0f };
 
 // Estado do jogo
 static GameState state = MENU;
@@ -54,6 +59,11 @@ void AtualizarJogo();
 void DesenharJogo();
 void RenderizarJogo();
 
+// Utilitários
+inline float ClampF(float v, float a, float b) { return (v < a) ? a : (v > b) ? b : v; }
+inline Rectangle PaddleRect(const Paddle &p) {
+    return { p.posicao.x - p.tamanho.x / 2.0f, p.posicao.y - p.tamanho.y / 2.0f, p.tamanho.x, p.tamanho.y };
+}
 
 int main() {
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Arkanoid");
@@ -126,7 +136,7 @@ int main() {
                             // obtém data atual YYYY-MM-DD
                             time_t t = time(nullptr);
                             struct tm *ptm = localtime(&t); // precisa <ctime>
-                            char dateBuf[16];
+                            char dateBuf[16] = "0000-00-00";
                             if (ptm) {
                                 strftime(dateBuf, sizeof(dateBuf), "%Y-%m-%d", ptm);
                             }
@@ -143,6 +153,11 @@ int main() {
 
                         if (IsKeyPressed(KEY_B)) {
                             // volta ao menu sem salvar
+
+                            fases = 1; 
+                            vidasPaddle = 3; 
+                            currentScore = 0;
+
                             DescarregarJogo();
                             state = MENU;
                             scoreSaved = false;
@@ -262,15 +277,31 @@ void InicializarJogo()
         break;
     }
 
-    tamanhoBloco = (Vector2) {GetScreenWidth() / BLOCOS_COLUNAS, 40};
-    InicPaddle(paddle, GetScreenWidth(), GetScreenHeight(), vidasPaddle);
-    blocos = InicBlocos(BLOCOS_LINHAS, BLOCOS_COLUNAS, GetScreenWidth(), GetScreenHeight(), tamanhoBloco, resistenciaBloco);
+    // --- configurar playfield dinamicamente caso a janela mude ---
+    const float marginX = 30.0f;
+    const float marginYTop = 40.0f;
+    const float marginYBottom = 40.0f;
+    playfield.x = marginX;
+    playfield.y = marginYTop;
+    playfield.width = (float)GetScreenWidth() - 2.0f * marginX;
+    playfield.height = (float)GetScreenHeight() - marginYTop - marginYBottom;
+
+    // calcula tamanho do bloco com base no playfield
+    tamanhoBloco = (Vector2){ playfield.width / (float)BLOCOS_COLUNAS, 40.0f };
+
+     // inicializa paddle dentro do playfield (posicionar no centro inferior do playfield)
+    InicPaddle(paddle, playfield, vidasPaddle);
+
+    // inicializa blocos usando playfield para posicionamento
+    blocos = InicBlocos(BLOCOS_LINHAS, BLOCOS_COLUNAS, playfield, tamanhoBloco, resistenciaBloco);
+
+    // define powerups
     SetLifePowerUp(blocos, BLOCOS_LINHAS, BLOCOS_COLUNAS, qtdPowerUpsLife);
     SetSizePowerUp(blocos, BLOCOS_LINHAS, BLOCOS_COLUNAS, qtdPowerUpsSize);
     SetVelocPowerUp(blocos, BLOCOS_LINHAS, BLOCOS_COLUNAS, qtdPowerUpsVeloc);
+
+    // inicializa bola centralizada sobre o paddle
     InicBola(bola, paddle, RAIO);
-    bola.ativo = false;
-    bola.velocidade = (Vector2){0.0f, 0.0f};
 
     // aplica dificuldade selecionada no menu
     currentDifficultyIndex = GetMenuDifficulty();
@@ -286,7 +317,7 @@ void ColisaoBolaPaddle()
 {
     if (!bola.ativo) return;
 
-    Rectangle paddleRect = {paddle.posicao.x - paddle.tamanho.x / 2, paddle.posicao.y - paddle.tamanho.y / 2, paddle.tamanho.x, paddle.tamanho.y};
+    Rectangle paddleRect = PaddleRect(paddle);
     Vector2 bolaCentro = {bola.posicao.x, bola.posicao.y};
 
     if (CheckCollisionCircleRec(bolaCentro, bola.raio, paddleRect))
@@ -296,6 +327,9 @@ void ColisaoBolaPaddle()
         float porcentagem = distancia / (paddle.tamanho.x / 2);
         bola.velocidade.x = porcentagem * 5.0f;
         PlayPaddleCollisionSound();
+
+        // garante que a bola não fique "dentro" do paddle
+        bola.posicao.y = paddle.posicao.y - paddle.tamanho.y/2.0f - bola.raio - 1.0f;
     }
 }
 
@@ -352,6 +386,9 @@ void ColisaoBolaBlocos()
                     if(b.sizePowerUp)
                     {
                         paddle.tamanho.x *= 1.2f;
+                         // recalc clamp para manter paddle dentro do playfield
+                        float halfW = paddle.tamanho.x / 2.0f;
+                        paddle.posicao.x = ClampF(paddle.posicao.x, playfield.x + halfW, playfield.x + playfield.width - halfW);
                         PlayPowerupSound();
                     }
                     if(b.velocPowerUp)
@@ -385,22 +422,30 @@ void ColisaoBolaBlocos()
 
 void ColisaoBolaParedes()
 {
-    if (bola.posicao.x - bola.raio <= 0 || bola.posicao.x + bola.raio >= GetScreenWidth())
+     // limites horizontais do playfield
+    float left = playfield.x + bola.raio;
+    float right = playfield.x + playfield.width - bola.raio;
+    float top = playfield.y + bola.raio;
+    float bottom = playfield.y + playfield.height - bola.raio;
+
+    if (bola.posicao.x <= left || bola.posicao.x >= right)
     {
         bola.velocidade.x *= -1;
         PlayWallCollisionSound();
+        bola.posicao.x = ClampF(bola.posicao.x, left, right);
     }
-    if (bola.posicao.y - bola.raio <= 0)
+    if (bola.posicao.y <= top)
     {
         bola.velocidade.y *= -1;
         PlayWallCollisionSound();
+        bola.posicao.y = top;
     }
-    if (bola.posicao.y + bola.raio >= GetScreenHeight())
+    if (bola.posicao.y >= bottom)
     {
         vidasPaddle--;
         bola.ativo = false;
         PlayLifeDownSound();
-        bola.posicao = (Vector2) {paddle.posicao.x + paddle.tamanho.x / 2.0f, paddle.posicao.y - bola.raio - 1.0f};
+        bola.posicao = (Vector2) {paddle.posicao.x, paddle.posicao.y - paddle.tamanho.y/2.0f - bola.raio - 1.0f};
         bola.velocidade = (Vector2) {0, 0};
         if (vidasPaddle <= 0)
         {
@@ -414,9 +459,9 @@ void DescarregarJogo()
     if (blocos == nullptr) return;
     for (int i = 0; i < BLOCOS_LINHAS; i++)
     {
-        free(blocos[i]);
+        delete[] blocos[i];
     }
-    free(blocos);
+    delete[] blocos;
     blocos = nullptr;
 }
 
@@ -434,14 +479,16 @@ void AtualizarJogo()
         if (!pauseGame)
         {
             if(IsKeyDown(KEY_LEFT)) paddle.posicao.x -= paddle.velocidade;
-            if((paddle.posicao.x - paddle.tamanho.x/2) <= 0) paddle.posicao.x = paddle.tamanho.x/2;
             if(IsKeyDown(KEY_RIGHT)) paddle.posicao.x += paddle.velocidade;
-            if((paddle.posicao.x + paddle.tamanho.x/2) >= GetScreenWidth()) paddle.posicao.x = GetScreenWidth() - paddle.tamanho.x/2;
+
+            // limites do paddle dentro do playfield
+            float halfW = paddle.tamanho.x / 2.0f;
+            paddle.posicao.x = ClampF(paddle.posicao.x, playfield.x + halfW, playfield.x + playfield.width - halfW);
 
             if(!bola.ativo && IsKeyPressed(KEY_SPACE))
             {
                 bola.ativo = true;
-                bola.velocidade = (Vector2) {0.0, -5.0f};
+                bola.velocidade = (Vector2) {0.0f, -5.0f};
             }
 
             if(bola.ativo){
@@ -485,14 +532,15 @@ void AtualizarJogo()
 
 void DesenharJogo()
 {
-    BeginDrawing();
+     BeginDrawing();
     ClearBackground(BLACK);
+
+    // desenha fundo do playfield (retângulo escuro)
+    DrawRectangleRec(playfield, DARKGRAY);
 
     if(!gameOver)
     {
-        DrawRectangleV((Vector2){paddle.posicao.x - paddle.tamanho.x / 2, paddle.posicao.y - paddle.tamanho.y / 2}, paddle.tamanho, WHITE);
-        DrawCircleV(bola.posicao, bola.raio, WHITE);
-
+        // blocos
         int linhas = BLOCOS_LINHAS;
         int colunas = BLOCOS_COLUNAS;
         for (int i = 0; i < linhas; i++)
@@ -502,34 +550,37 @@ void DesenharJogo()
                 Bloco &b = blocos[i][j];
                 if (b.ativo)
                 {
-                    if (b.vidas == 3)
-                        DrawRectangleV((Vector2){b.posicao.x - b.tamanho.x / 2, b.posicao.y - b.tamanho.y / 2}, b.tamanho, RED);
-                    else if (b.vidas == 2)
-                        DrawRectangleV((Vector2){b.posicao.x - b.tamanho.x / 2, b.posicao.y - b.tamanho.y / 2}, b.tamanho, ORANGE);
-                    else
-                        DrawRectangleV((Vector2){b.posicao.x - b.tamanho.x / 2, b.posicao.y - b.tamanho.y / 2}, b.tamanho, YELLOW);
+                    Color c = (b.vidas == 3) ? RED : (b.vidas == 2 ? ORANGE : YELLOW);
+                    DrawRectangleV((Vector2){b.posicao.x - b.tamanho.x / 2, b.posicao.y - b.tamanho.y / 2}, b.tamanho, c);
 
                     if (b.lifePowerUp)
                     {
                         DrawRectangleV((Vector2){b.posicao.x - b.tamanho.x / 2, b.posicao.y - b.tamanho.y / 2}, b.tamanho, PINK);
-                        DrawText("L", b.posicao.x - 5, b.posicao.y - 10, 20, BLACK);
+                        DrawText("L", (int)(b.posicao.x - 5), (int)(b.posicao.y - 10), 20, BLACK);
                     }
                     else if (b.sizePowerUp)
                     {
                         DrawRectangleV((Vector2){b.posicao.x - b.tamanho.x / 2, b.posicao.y - b.tamanho.y / 2}, b.tamanho, PURPLE);
-                        DrawText("S", b.posicao.x - 5, b.posicao.y - 10, 20, BLACK);
+                        DrawText("S", (int)(b.posicao.x - 5), (int)(b.posicao.y - 10), 20, BLACK);
                     }
                     else if (b.velocPowerUp)
                     {
                         DrawRectangleV((Vector2){b.posicao.x - b.tamanho.x / 2, b.posicao.y - b.tamanho.y / 2}, b.tamanho, GREEN);
-                        DrawText("V", b.posicao.x - 5, b.posicao.y - 10, 20, BLACK);
+                        DrawText("V", (int)(b.posicao.x - 5), (int)(b.posicao.y - 10), 20, BLACK);
                     }
 
-                    DrawRectangleLines(b.posicao.x - b.tamanho.x / 2, b.posicao.y - b.tamanho.y / 2, b.tamanho.x, b.tamanho.y, BLACK);
+                    DrawRectangleLines((int)(b.posicao.x - b.tamanho.x / 2), (int)(b.posicao.y - b.tamanho.y / 2), (int)b.tamanho.x, (int)b.tamanho.y, BLACK);
                 }
             }
         }
 
+        // paddle (desenho simples; substitua por sprite quando pronto)
+        DrawRectangleV((Vector2){paddle.posicao.x - paddle.tamanho.x / 2, paddle.posicao.y - paddle.tamanho.y / 2}, paddle.tamanho, WHITE);
+
+        // bola
+        DrawCircleV(bola.posicao, bola.raio, WHITE);
+
+        // HUD fora do playfield
         DrawText(("Vidas: " + to_string(vidasPaddle)).c_str(), 10, 10, 20, WHITE);
         DrawText(("Score: " + to_string(currentScore + fasePoints)).c_str(), GetScreenWidth() - 200, 10, 20, WHITE);
 
