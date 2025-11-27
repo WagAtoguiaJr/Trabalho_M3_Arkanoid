@@ -1,5 +1,6 @@
 #include "ranking.h"
 #include "raylib.h"
+#include "timer.h"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
@@ -18,16 +19,18 @@ void LoadRankingCSV(const char* filename, vector<RankEntry> &outList)
     while (getline(in, line)) {
         if (line.empty()) continue;
         stringstream ss(line);
-        string date, name, scoreStr, diffStr;
+        string date, name, scoreStr, timeStr, diffStr;
         if (getline(ss, date, ';') &&
             getline(ss, name, ';') &&
             getline(ss, scoreStr, ';') &&
+            getline(ss, timeStr, ';') &&
             getline(ss, diffStr))
         {
             RankEntry e;
             e.date = date;
             e.name = name;
             e.score = stoi(scoreStr);
+            e.timeSeconds = stod(timeStr);
             e.difficulty = stoi(diffStr);
             outList.push_back(e);
         }
@@ -43,7 +46,7 @@ void AppendRankingCSV(const char* filename, const RankEntry &entry)
         out.open(filename, ios::out);
         if (!out.is_open()) return;
     }
-    out << entry.date << ";" << entry.name << ";" << entry.score << ";" << entry.difficulty << "\n";
+    out << entry.date << ";" << entry.name << ";" << entry.score << ";" << entry.timeSeconds << ";" << entry.difficulty << "\n";
     out.close();
 }
 
@@ -52,6 +55,7 @@ static bool RankComparator(const RankEntry &a, const RankEntry &b)
 {
     if (a.score != b.score) return a.score > b.score;
     if (a.difficulty != b.difficulty) return a.difficulty > b.difficulty;
+    if (a.timeSeconds != b.timeSeconds) return a.timeSeconds < b.timeSeconds;
     // data mais antiga primeiro -> string YYYY-MM-DD, lexicographic funciona
     return a.date < b.date;
 }
@@ -72,7 +76,7 @@ void DrawRankingScreen()
     for (int i = 0; i < maxShow; ++i) {
         const RankEntry &e = list[i];
         const char* diffText = (e.difficulty == 0) ? "Fácil" : (e.difficulty == 1) ? "Médio" : "Difícil";
-        string line = to_string(i+1) + ". " + e.name + " - " + to_string(e.score) + " - " + diffText + " - " + e.date;
+        string line = to_string(i+1) + ". " + e.name + " | " + to_string(e.score) + " | " + FormatTime(e.timeSeconds) + " | " + diffText + " | " + e.date + " | ";
         DrawText(line.c_str(), 40, y + i*28, 20, WHITE);
     }
 

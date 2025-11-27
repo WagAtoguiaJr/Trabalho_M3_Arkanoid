@@ -1,5 +1,7 @@
 #include "raylib.h"
 #include <iostream>
+#include <iomanip>
+#include <sstream>
 #include <cmath>
 #include <ctime>
 #include <string>
@@ -9,6 +11,7 @@
 #include "audio.h"
 #include "menu.h"
 #include "ranking.h"
+#include "timer.h"
 
 using namespace std;
 
@@ -49,7 +52,7 @@ static bool pauseGame = false;
 static bool vitoria = false;
 
 // Protótipos locais
-void InicializarJogo();
+void InicializarJogo(bool resetTimer = true);
 void DescarregarJogo();
 void CalculaPontuacao();
 void ColisaoBolaPaddle();
@@ -60,7 +63,10 @@ void DesenharJogo();
 void RenderizarJogo();
 
 // Utilitários
-inline float ClampF(float v, float a, float b) { return (v < a) ? a : (v > b) ? b : v; }
+inline float ClampF(float v, float a, float b) { 
+    return (v < a) ? a : (v > b) ? b : v; 
+}
+
 inline Rectangle PaddleRect(const Paddle &p) {
     return { p.posicao.x - p.tamanho.x / 2.0f, p.posicao.y - p.tamanho.y / 2.0f, p.tamanho.x, p.tamanho.y };
 }
@@ -86,7 +92,9 @@ int main() {
                 DrawMenu();
                 if (shouldStartGame) {
                     // inicia jogo com a dificuldade selecionada
-                    InicializarJogo();
+                    InicializarJogo(true);
+                    ResetTimer();
+                    StartTimer();
                     shouldStartGame = false;
                 }
                 break;
@@ -115,6 +123,13 @@ int main() {
             {
                 bool allowSave = (!vitoria) || (vitoria && fases >= 3);
                 DrawGameOverScreen(vitoria, allowSave, scoreSaved, inputPlayerName);
+
+                {
+                    string finalTimeStr = FormatTime(GetElapsedTime());
+                    int tw = MeasureText(finalTimeStr.c_str(), 20);
+                    DrawText(("Tempo: " + finalTimeStr).c_str(), GetScreenWidth()/2 - tw/2 - 20, GetScreenHeight()/2 + 80, 20, WHITE);
+                }
+
                 if (allowSave) {
                     if (!scoreSaved) {
                         // captura caracteres digitados
@@ -146,6 +161,7 @@ int main() {
                             entry.name = inputPlayerName;
                             entry.score = currentScore;
                             entry.difficulty = currentDifficultyIndex;
+                            entry.timeSeconds = GetElapsedTime();
 
                             AppendRankingCSV("rank/ranking.csv", entry);
                             scoreSaved = true;
@@ -164,6 +180,7 @@ int main() {
                             inputPlayerName.clear();
                             // reset counters para evitar reaparecer gameover
                             currentScore = 0;
+                            StopTimer();
                         }
                     } else {
                         if (IsKeyPressed(KEY_ENTER)) {
@@ -177,7 +194,9 @@ int main() {
                             cout << "Teste de Reset Apos Save - Resetou" << endl;
 
                             DescarregarJogo();
-                            InicializarJogo();
+                            ResetTimer();
+                            InicializarJogo(true);
+                            StartTimer();
                             scoreSaved = false;
                             inputPlayerName.clear();
                             state = PLAYING;
@@ -198,14 +217,17 @@ int main() {
                             scoreSaved = false;
                             inputPlayerName.clear();
                             currentScore = 0;
+                            StopTimer();
                         }
                     }
                 } else {
                     if (IsKeyPressed(KEY_ENTER)) {
                         // avança para próxima fase (sem salvar)
+                        StopTimer();
                         fases++;
                         DescarregarJogo();
-                        InicializarJogo();
+                        InicializarJogo(false);
+                        StartTimer();
                         state = PLAYING;
                     }
                     if (IsKeyPressed(KEY_B)) {
@@ -214,6 +236,7 @@ int main() {
                         fases = 1; 
                         vidasPaddle = 3; 
                         currentScore = 0;
+                        StopTimer();
                     }
                 }
             }
@@ -232,8 +255,15 @@ int main() {
     return 0;
 }
 
-void InicializarJogo()
+void InicializarJogo(bool resetTimer)
 {
+    
+    if (resetTimer) {
+        ResetTimer();
+        StartTimer();
+    } else {
+        // mantém timer acumulado
+    }
     
     gameOver = false;
     vitoria = false;
@@ -279,7 +309,7 @@ void InicializarJogo()
 
     // --- configurar playfield dinamicamente caso a janela mude ---
     const float marginX = 30.0f;
-    const float marginYTop = 40.0f;
+    const float marginYTop = 60.0f;
     const float marginYBottom = 40.0f;
     playfield.x = marginX;
     playfield.y = marginYTop;
@@ -450,6 +480,7 @@ void ColisaoBolaParedes()
         if (vidasPaddle <= 0)
         {
             gameOver = true;
+            StopTimer();
         }
     }
 }
@@ -474,7 +505,14 @@ void AtualizarJogo()
 {
     if(!gameOver)
     {
-        if (IsKeyPressed('P')) pauseGame = !pauseGame;
+        if (IsKeyPressed('P')) {
+            pauseGame = !pauseGame;
+            if (pauseGame) {
+                StopTimer();
+            } else {
+                StartTimer();
+            }
+        }
 
         if (!pauseGame)
         {
@@ -505,6 +543,8 @@ void AtualizarJogo()
             if (vidasPaddle <= 0)
             {
                 gameOver = true;
+                StopTimer();
+
             } else {
                 bool todosDestruidos = true;
                 for (int i = 0; i < BLOCOS_LINHAS; i++)
@@ -524,6 +564,7 @@ void AtualizarJogo()
                 {
                     gameOver = true;
                     vitoria = true;
+                    StopTimer();
                 }
             }
         }
@@ -582,18 +623,20 @@ void DesenharJogo()
 
         // HUD fora do playfield
         DrawText(("Vidas: " + to_string(vidasPaddle)).c_str(), 10, 10, 20, WHITE);
-        DrawText(("Score: " + to_string(currentScore + fasePoints)).c_str(), GetScreenWidth() - 200, 10, 20, WHITE);
+        DrawText(("Score: " + to_string(currentScore + fasePoints)).c_str(), GetScreenWidth() - 180, 10, 20, WHITE);
+
+        // tempo atual (topo central)
+        {
+            string timeStr = FormatTime(GetElapsedTime());
+            int timeW = MeasureText(timeStr.c_str(), 20);
+            DrawText(timeStr.c_str(), GetScreenWidth()/2 - timeW/2 - 20, 10, 20, LIGHTGRAY);
+        }
 
         if (pauseGame)
         {
-            DrawText("PAUSE", GetScreenWidth() / 2 - MeasureText("PAUSE", 40) / 2, GetScreenHeight() / 2 - 20, 40, YELLOW);
+            DrawText("PAUSE", GetScreenWidth() / 2 - MeasureText("PAUSE", 40) / 2, GetScreenHeight() / 2 - 10, 40, BLUE);
         }
     }
-    else
-    {
-        // tela de gameover é desenhada pelo menu (DrawGameOverScreen)
-    }
-
     EndDrawing();
 }
 

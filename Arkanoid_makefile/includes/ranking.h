@@ -11,6 +11,7 @@ struct RankEntry {
     string name;
     int score;
     int difficulty; // 0,1,2
+    double timeSeconds;
 };
 
 static bool RankComparator(const RankEntry &a, const RankEntry &b);
