@@ -7,7 +7,7 @@
 #include <string>
 #include <algorithm>
 
-#include "objetos.h"
+#include "objects.h"
 #include "audio.h"
 #include "menu.h"
 #include "ranking.h"
@@ -22,18 +22,14 @@ using namespace std;
 #define BLOCOS_COLUNAS 10
 #define BLOCOS_LINHAS 3
 
-// Playfield: área onde bola, blocos e paddle existem
 static Rectangle playfield = { 60.0f, 80.0f, SCREEN_WIDTH - 120.0f, SCREEN_HEIGHT - 160.0f };
 
-// Estado do jogo
 static GameState state = MENU;
-
-// Jogo
 Paddle paddle;
 int vidasPaddle = 3;
 int fases = 1;
-Bola bola;
-Bloco** blocos = nullptr;
+Ball bola;
+Brick** blocos = nullptr;
 Vector2 tamanhoBloco;
 
 static int blocosDestruidosFase = 0;
@@ -44,25 +40,22 @@ static int currentScore = 0;
 
 float modVelocBola = 1.0f; 
 
-// Flags auxiliares
 static bool scoreSaved = false;
 static string inputPlayerName = "";
 static bool gameOver = false;
 static bool pauseGame = false;
 static bool vitoria = false;
 
-// Protótipos locais
-void InicializarJogo(bool resetTimer = true);
-void DescarregarJogo();
-void CalculaPontuacao();
-void ColisaoBolaPaddle();
-void ColisaoBolaBlocos();
-void ColisaoBolaParedes();
-void AtualizarJogo();
-void DesenharJogo();
-void RenderizarJogo();
+void InitGame(bool resetTimer = true);
+void UnloadGame();
+void Scoring();
+void CollisionBallPaddle();
+void CollisionBallBrick();
+void CollisionBallWalls();
+void UpdateGame();
+void DrawGame();
+void PlayGame();
 
-// Utilitários
 inline float ClampF(float v, float a, float b) { 
     return (v < a) ? a : (v > b) ? b : v; 
 }
@@ -75,11 +68,9 @@ int main() {
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Arkanoid");
     SetTargetFPS(60);
 
-    // Inicializa áudio e assets
     InitAudioSystem();
     LoadAudioAssets();
 
-    // Inicializa menu
     InitMenu();
 
     bool shouldStartGame = false;
@@ -91,8 +82,7 @@ int main() {
                 UpdateMenu(state, fases, shouldStartGame);
                 DrawMenu();
                 if (shouldStartGame) {
-                    // inicia jogo com a dificuldade selecionada
-                    InicializarJogo(true);
+                    InitGame(true);
                     ResetTimer();
                     StartTimer();
                     shouldStartGame = false;
@@ -100,8 +90,8 @@ int main() {
                 break;
 
             case PLAYING:
-                UpdateAudio(); // atualiza stream de música
-                RenderizarJogo();
+                UpdateAudio();
+                PlayGame();
                 if (gameOver) {
                     state = GAMEOVER;
                     currentScore = currentScore + fasePoints;
@@ -122,17 +112,10 @@ int main() {
             case GAMEOVER:
             {
                 bool allowSave = (!vitoria) || (vitoria && fases >= 3);
-                DrawGameOverScreen(vitoria, allowSave, scoreSaved, inputPlayerName);
-
-                {
-                    string finalTimeStr = FormatTime(GetElapsedTime());
-                    int tw = MeasureText(finalTimeStr.c_str(), 20);
-                    DrawText(("Tempo: " + finalTimeStr).c_str(), GetScreenWidth()/2 - tw/2 - 20, GetScreenHeight()/2 + 80, 20, WHITE);
-                }
+                DrawGameOverScreen(vitoria, allowSave, scoreSaved, currentScore, inputPlayerName);
 
                 if (allowSave) {
                     if (!scoreSaved) {
-                        // captura caracteres digitados
                         int key = GetKeyPressed();
                         while (key > 0) {
                             int c = key;
@@ -148,9 +131,8 @@ int main() {
                         if (IsKeyPressed(KEY_ENTER)) {
                             if (inputPlayerName.empty()) inputPlayerName = "PLAYER";
 
-                            // obtém data atual YYYY-MM-DD
                             time_t t = time(nullptr);
-                            struct tm *ptm = localtime(&t); // precisa <ctime>
+                            struct tm *ptm = localtime(&t);
                             char dateBuf[16] = "0000-00-00";
                             if (ptm) {
                                 strftime(dateBuf, sizeof(dateBuf), "%Y-%m-%d", ptm);
@@ -168,34 +150,28 @@ int main() {
                         }
 
                         if (IsKeyPressed(KEY_B)) {
-                            // volta ao menu sem salvar
 
                             fases = 1; 
                             vidasPaddle = 3; 
                             currentScore = 0;
 
-                            DescarregarJogo();
+                            UnloadGame();
                             state = MENU;
                             scoreSaved = false;
                             inputPlayerName.clear();
-                            // reset counters para evitar reaparecer gameover
                             currentScore = 0;
                             StopTimer();
                         }
                     } else {
                         if (IsKeyPressed(KEY_ENTER)) {
-                            
-                            cout << "Teste de Reset Apos Save - Entrou" << endl;
-                            
+                             
                             fases = 1; 
                             vidasPaddle = 3; 
                             currentScore = 0;
 
-                            cout << "Teste de Reset Apos Save - Resetou" << endl;
-
-                            DescarregarJogo();
+                            UnloadGame();
                             ResetTimer();
-                            InicializarJogo(true);
+                            InitGame(true);
                             StartTimer();
                             scoreSaved = false;
                             inputPlayerName.clear();
@@ -204,15 +180,11 @@ int main() {
 
                         if (IsKeyPressed(KEY_B)) {
                             
-                            cout << "Teste de Reset Apos Save - Entrou" << endl;
-                            
                             fases = 1; 
                             vidasPaddle = 3; 
                             currentScore = 0;
-
-                            cout << "Teste de Reset Apos Save - Resetou" << endl;
                             
-                            DescarregarJogo();
+                            UnloadGame();
                             state = MENU;
                             scoreSaved = false;
                             inputPlayerName.clear();
@@ -222,16 +194,15 @@ int main() {
                     }
                 } else {
                     if (IsKeyPressed(KEY_ENTER)) {
-                        // avança para próxima fase (sem salvar)
                         StopTimer();
                         fases++;
-                        DescarregarJogo();
-                        InicializarJogo(false);
+                        UnloadGame();
+                        InitGame(false);
                         StartTimer();
                         state = PLAYING;
                     }
                     if (IsKeyPressed(KEY_B)) {
-                        DescarregarJogo();
+                        UnloadGame();
                         state = MENU;
                         fases = 1; 
                         vidasPaddle = 3; 
@@ -248,21 +219,17 @@ int main() {
         }
     }
 
-    // limpeza
-    DescarregarJogo();
+    UnloadGame();
     UnloadAudioSystem();
     CloseWindow();
     return 0;
 }
 
-void InicializarJogo(bool resetTimer)
+void InitGame(bool resetTimer)
 {
-    
     if (resetTimer) {
         ResetTimer();
         StartTimer();
-    } else {
-        // mantém timer acumulado
     }
     
     gameOver = false;
@@ -273,13 +240,12 @@ void InicializarJogo(bool resetTimer)
     blocosDestruidosFase = 0;
     fasePoints = 0;
 
-    // garante descarregar blocos anteriores se existirem
     if (blocos != nullptr) {
-        DescarregarJogo();
+        UnloadGame();
     }
 
     int resistenciaBloco = 1;
-    int qtdPowerUpsLife = 3;
+    int qtdPowerUpsLife = 2;
     int qtdPowerUpsSize = 2;
     int qtdPowerUpsVeloc = 2;
 
@@ -287,13 +253,13 @@ void InicializarJogo(bool resetTimer)
     {
     case 1:
         resistenciaBloco = 1;
-        qtdPowerUpsLife = 3;
+        qtdPowerUpsLife = 2;
         qtdPowerUpsSize = 2;
         qtdPowerUpsVeloc = 2;
         break;
     case 2:
         resistenciaBloco = 2;
-        qtdPowerUpsLife = 2;
+        qtdPowerUpsLife = 1;
         qtdPowerUpsSize = 1;
         qtdPowerUpsVeloc = 2;
         break;
@@ -307,7 +273,6 @@ void InicializarJogo(bool resetTimer)
         break;
     }
 
-    // --- configurar playfield dinamicamente caso a janela mude ---
     const float marginX = 30.0f;
     const float marginYTop = 60.0f;
     const float marginYBottom = 40.0f;
@@ -316,34 +281,34 @@ void InicializarJogo(bool resetTimer)
     playfield.width = (float)GetScreenWidth() - 2.0f * marginX;
     playfield.height = (float)GetScreenHeight() - marginYTop - marginYBottom;
 
-    // calcula tamanho do bloco com base no playfield
-    tamanhoBloco = (Vector2){ playfield.width / (float)BLOCOS_COLUNAS, 40.0f };
+    tamanhoBloco = (Vector2){ playfield.width / (float) BLOCOS_COLUNAS, 40.0f };
 
-     // inicializa paddle dentro do playfield (posicionar no centro inferior do playfield)
-    InicPaddle(paddle, playfield, vidasPaddle);
+    InitPaddle(paddle, playfield, vidasPaddle);
 
-    // inicializa blocos usando playfield para posicionamento
-    blocos = InicBlocos(BLOCOS_LINHAS, BLOCOS_COLUNAS, playfield, tamanhoBloco, resistenciaBloco);
-
-    // define powerups
+    blocos = InitBricks(BLOCOS_LINHAS, BLOCOS_COLUNAS, playfield, tamanhoBloco, resistenciaBloco);
     SetLifePowerUp(blocos, BLOCOS_LINHAS, BLOCOS_COLUNAS, qtdPowerUpsLife);
     SetSizePowerUp(blocos, BLOCOS_LINHAS, BLOCOS_COLUNAS, qtdPowerUpsSize);
     SetVelocPowerUp(blocos, BLOCOS_LINHAS, BLOCOS_COLUNAS, qtdPowerUpsVeloc);
 
-    // inicializa bola centralizada sobre o paddle
-    InicBola(bola, paddle, RAIO);
-
-    // aplica dificuldade selecionada no menu
+    InitBall(bola, paddle, RAIO);
     currentDifficultyIndex = GetMenuDifficulty();
     switch (currentDifficultyIndex) {
-        case 0: modVelocBola = difficultyMultiplier = 1.0f; break;
-        case 1: modVelocBola = difficultyMultiplier = 1.25f; break;
-        case 2: modVelocBola = difficultyMultiplier =  1.5f; break;
+        case 0: 
+            modVelocBola = difficultyMultiplier = 1.0f; 
+            break;
+        case 1: 
+            modVelocBola = 1.25f;
+            difficultyMultiplier = 1.5f;
+            break;
+        case 2: 
+            modVelocBola = 1.5f; 
+            difficultyMultiplier = 2.0f;
+            break;
         default: modVelocBola = difficultyMultiplier = 1.0f; break;
     }
 }
 
-void ColisaoBolaPaddle()
+void CollisionBallPaddle()
 {
     if (!bola.ativo) return;
 
@@ -358,45 +323,37 @@ void ColisaoBolaPaddle()
         bola.velocidade.x = porcentagem * 5.0f;
         PlayPaddleCollisionSound();
 
-        // garante que a bola não fique "dentro" do paddle
         bola.posicao.y = paddle.posicao.y - paddle.tamanho.y/2.0f - bola.raio - 1.0f;
     }
 }
 
-void ColisaoBolaBlocos()
+void CollisionBallBrick()
 {
     int linhas = BLOCOS_LINHAS;
     int colunas = BLOCOS_COLUNAS;
 
     if (!bola.ativo) return;
 
-    // evita múltiplas colisões por frame (comportamento clássico)
     bool colisaoTratada = false;
 
     for (int i = 0; i < linhas && !colisaoTratada; i++)
     {
         for (int j = 0; j < colunas && !colisaoTratada; j++)
         {
-            Bloco &b = blocos[i][j];
+            Brick &b = blocos[i][j];
 
             if (!b.ativo) continue;
 
-            // Metade das dimensões do bloco
             float halfW = b.tamanho.x * 0.5f;
             float halfH = b.tamanho.y * 0.5f;
 
-            // Distância entre centros
             float dx = bola.posicao.x - b.posicao.x;
             float dy = bola.posicao.y - b.posicao.y;
 
-            // Penetração (quanto o círculo e o retângulo se sobrepõem)
             float sobreposX = (halfW + bola.raio) - fabsf(dx);
             float sobreposY = (halfH + bola.raio) - fabsf(dy);
-
-            // Colisão detectada
             if (sobreposX > 0.0f && sobreposY > 0.0f)
             {
-                // Destrói o bloco
                 b.vidas--;
                 PlayBlockCollisionSound();
 
@@ -406,7 +363,7 @@ void ColisaoBolaBlocos()
                     PlayBlockDestroySound();
 
                     blocosDestruidosFase++;
-                    CalculaPontuacao();
+                    Scoring();
 
                     if(b.lifePowerUp)
                     {
@@ -416,7 +373,6 @@ void ColisaoBolaBlocos()
                     if(b.sizePowerUp)
                     {
                         paddle.tamanho.x *= 1.2f;
-                         // recalc clamp para manter paddle dentro do playfield
                         float halfW = paddle.tamanho.x / 2.0f;
                         paddle.posicao.x = ClampF(paddle.posicao.x, playfield.x + halfW, playfield.x + playfield.width - halfW);
                         PlayPowerupSound();
@@ -428,12 +384,9 @@ void ColisaoBolaBlocos()
                     }
                 }
 
-                // Reflete a velocidade com base na menor penetração (eixo de colisão principal)
                 if (sobreposX < sobreposY)
                 {
-                     // Colisão mais horizontal -> inverter velocidade X
                      bola.velocidade.x *= -1.0f;
-                    // Ajuste de posição para evitar ficar "dentro" do bloco
                      if (dx > 0.0f) bola.posicao.x += sobreposX;
                      else bola.posicao.x -= sobreposX;
                 }
@@ -450,9 +403,8 @@ void ColisaoBolaBlocos()
     }
 }
 
-void ColisaoBolaParedes()
+void CollisionBallWalls()
 {
-     // limites horizontais do playfield
     float left = playfield.x + bola.raio;
     float right = playfield.x + playfield.width - bola.raio;
     float top = playfield.y + bola.raio;
@@ -485,7 +437,7 @@ void ColisaoBolaParedes()
     }
 }
 
-void DescarregarJogo()
+void UnloadGame()
 {
     if (blocos == nullptr) return;
     for (int i = 0; i < BLOCOS_LINHAS; i++)
@@ -496,12 +448,12 @@ void DescarregarJogo()
     blocos = nullptr;
 }
 
-void CalculaPontuacao()
+void Scoring()
 {
     fasePoints = (int) roundf((blocosDestruidosFase * 10) * (float) fases * difficultyMultiplier);
 }
 
-void AtualizarJogo()
+void UpdateGame()
 {
     if(!gameOver)
     {
@@ -519,7 +471,6 @@ void AtualizarJogo()
             if(IsKeyDown(KEY_LEFT)) paddle.posicao.x -= paddle.velocidade;
             if(IsKeyDown(KEY_RIGHT)) paddle.posicao.x += paddle.velocidade;
 
-            // limites do paddle dentro do playfield
             float halfW = paddle.tamanho.x / 2.0f;
             paddle.posicao.x = ClampF(paddle.posicao.x, playfield.x + halfW, playfield.x + playfield.width - halfW);
 
@@ -536,9 +487,9 @@ void AtualizarJogo()
                 bola.posicao = (Vector2) {paddle.posicao.x, paddle.posicao.y - paddle.tamanho.y/2 - bola.raio - 1.0f};
             }
 
-            ColisaoBolaPaddle();
-            ColisaoBolaBlocos();
-            ColisaoBolaParedes();
+            CollisionBallPaddle();
+            CollisionBallBrick();
+            CollisionBallWalls();
 
             if (vidasPaddle <= 0)
             {
@@ -571,24 +522,22 @@ void AtualizarJogo()
     }
 }
 
-void DesenharJogo()
+void DrawGame()
 {
-     BeginDrawing();
+    BeginDrawing();
     ClearBackground(BLACK);
 
-    // desenha fundo do playfield (retângulo escuro)
     DrawRectangleRec(playfield, DARKGRAY);
 
     if(!gameOver)
     {
-        // blocos
         int linhas = BLOCOS_LINHAS;
         int colunas = BLOCOS_COLUNAS;
         for (int i = 0; i < linhas; i++)
         {
             for (int j = 0; j < colunas; j++)
             {
-                Bloco &b = blocos[i][j];
+                Brick &b = blocos[i][j];
                 if (b.ativo)
                 {
                     Color c = (b.vidas == 3) ? RED : (b.vidas == 2 ? ORANGE : YELLOW);
@@ -602,7 +551,7 @@ void DesenharJogo()
                     else if (b.sizePowerUp)
                     {
                         DrawRectangleV((Vector2){b.posicao.x - b.tamanho.x / 2, b.posicao.y - b.tamanho.y / 2}, b.tamanho, PURPLE);
-                        DrawText("S", (int)(b.posicao.x - 5), (int)(b.posicao.y - 10), 20, BLACK);
+                        DrawText("T", (int)(b.posicao.x - 5), (int)(b.posicao.y - 10), 20, BLACK);
                     }
                     else if (b.velocPowerUp)
                     {
@@ -615,21 +564,16 @@ void DesenharJogo()
             }
         }
 
-        // paddle (desenho simples; substitua por sprite quando pronto)
         DrawRectangleV((Vector2){paddle.posicao.x - paddle.tamanho.x / 2, paddle.posicao.y - paddle.tamanho.y / 2}, paddle.tamanho, WHITE);
 
-        // bola
         DrawCircleV(bola.posicao, bola.raio, WHITE);
-
-        // HUD fora do playfield
         DrawText(("Vidas: " + to_string(vidasPaddle)).c_str(), 10, 10, 20, WHITE);
-        DrawText(("Score: " + to_string(currentScore + fasePoints)).c_str(), GetScreenWidth() - 180, 10, 20, WHITE);
+        DrawText(("Score: " + to_string(currentScore + fasePoints)).c_str(), GetScreenWidth() - 160, 10, 20, WHITE);
 
-        // tempo atual (topo central)
         {
             string timeStr = FormatTime(GetElapsedTime());
             int timeW = MeasureText(timeStr.c_str(), 20);
-            DrawText(timeStr.c_str(), GetScreenWidth()/2 - timeW/2 - 20, 10, 20, LIGHTGRAY);
+            DrawText(timeStr.c_str(), GetScreenWidth()/2 - timeW/2 - 40, 10, 20, LIGHTGRAY);
         }
 
         if (pauseGame)
@@ -640,8 +584,8 @@ void DesenharJogo()
     EndDrawing();
 }
 
-void RenderizarJogo()
+void PlayGame()
 {
-    AtualizarJogo();
-    DesenharJogo();
+    UpdateGame();
+    DrawGame();
 }

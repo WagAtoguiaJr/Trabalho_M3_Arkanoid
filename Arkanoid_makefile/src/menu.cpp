@@ -1,5 +1,7 @@
 #include "menu.h"
-#include "audio.h" // chama PlayMenuNavigateSound / PlayMenuSelectSound
+#include "audio.h"
+#include "raylib.h"
+#include "timer.h"
 #include <iostream>
 #include <vector>
 #include <ctime>
@@ -10,7 +12,7 @@ using namespace std;
 static int menuIndex = 0;
 static const char* menuItems[] = { "Iniciar Jogo", "Dificuldade", "Controles", "Ranking", "Sair" };
 static const int MENU_COUNT = 5;
-static int difficulty = 0; // 0=Fácil,1=Médio,2=Difícil
+static int difficulty = 0;
 
 void InitMenu() {
     menuIndex = 0;
@@ -27,11 +29,10 @@ int GetMenuDifficulty() {
 }
 
 static const char* DifficultyText(int d) {
-    return (d == 0) ? "Facil" : (d == 1) ? "Medio" : "Dificil";
+    return (d == 0) ? "Fácil" : (d == 1) ? "Médio" : "Difícil";
 }
 
 void UpdateMenu(GameState &state, int &fases, bool &shouldStartGame) {
-    // Navegação
     if (IsKeyPressed(KEY_DOWN)) {
         menuIndex = (menuIndex + 1) % MENU_COUNT;
         PlayMenuNavigateSound();
@@ -41,7 +42,6 @@ void UpdateMenu(GameState &state, int &fases, bool &shouldStartGame) {
         PlayMenuNavigateSound();
     }
 
-    // Alternar dificuldade quando o item estiver selecionado
     if (menuIndex == 1) {
         if (IsKeyPressed(KEY_LEFT)) {
             SetMenuDifficulty((difficulty - 1 + 3) % 3);
@@ -53,25 +53,23 @@ void UpdateMenu(GameState &state, int &fases, bool &shouldStartGame) {
         }
     }
 
-    // Seleção
     if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE)) {
         PlayMenuSelectSound();
         switch (menuIndex) {
-            case 0: // Iniciar Jogo
+            case 0:
                 shouldStartGame = true;
                 state = PLAYING;
                 break;
-            case 1: // Dificuldade (já alterada com left/right)
-                // apenas feedback sonoro já tocado
+            case 1:
                 break;
-            case 2: // Controles
+            case 2:
                 state = CONTROLS;
                 break;
-            case 3: // Pontuação / Ranking
+            case 3:
                 state = RANKING;
                 break;
-            case 4: // Sair
-                CloseWindow(); // força saída do loop principal
+            case 4:
+                CloseWindow();
                 break;
         }
     }
@@ -110,61 +108,64 @@ void DrawControlsScreen() {
     EndDrawing();
 }
 
-void DrawGameOverScreen(const bool &vitoria, const bool &allowSave, const bool &scoreSaved, const std::string &inputPlayerName)
+void DrawGameOverScreen(const bool &vitoria, const bool &allowSave, const bool &scoreSaved, const int &score, const string &inputPlayerName)
 {
     const int screenW = GetScreenWidth();
     const int screenH = GetScreenHeight();
 
-    // Margens e espaçamentos
     const int marginX = 60;
     const int bottomMargin = 60;
     const int titleSize = 40;
     const int subtitleSize = 30;
     const int textSize = 20;
     const int inputSize = 30;
-    const int lineSpacing = 8; // espaço extra entre linhas
+    const int lineSpacing = 8;
 
     BeginDrawing();
     ClearBackground(BLACK);
 
-    // --- Título (centralizado)
     const char *titleText = vitoria ? "VOCÊ VENCEU!" : "GAME OVER";
     Color titleColor = vitoria ? GREEN : RED;
     int titleW = MeasureText(titleText, titleSize);
     int titleX = screenW / 2 - titleW / 2;
-    int titleY = screenH / 6; // coloca o título no terço superior
+    int titleY = screenH / 6;
     DrawText(titleText, titleX, titleY, titleSize, titleColor);
 
-    // calcula posição inicial para o bloco de conteúdo abaixo do título
-    int y = titleY + titleSize + 24; // 24 px de folga após o título
+    int y = titleY + titleSize + 18;
 
-    // --- Se pode salvar (derrota ou fim do jogo)
+    {
+        string scoreLabel = "Score: " + to_string(score);
+        int scoreW = MeasureText(scoreLabel.c_str(), subtitleSize);
+        DrawText(scoreLabel.c_str(), screenW / 2 - scoreW / 2, y, subtitleSize, RAYWHITE);
+        y += subtitleSize + 6;
+
+        string timeLabel = "Tempo: " + FormatTime(GetElapsedTime());
+        int timeW = MeasureText(timeLabel.c_str(), textSize);
+        DrawText(timeLabel.c_str(), screenW / 2 - timeW / 2, y, textSize, LIGHTGRAY);
+        y += textSize + (lineSpacing * 2);
+    }
+
     if (allowSave)
     {
         if (!scoreSaved)
         {
-            // Linha de instrução
             DrawText("Digite seu nome e pressione ENTER para salvar:", marginX, y, textSize, WHITE);
             int instrH = textSize;
             y += instrH + lineSpacing;
 
-            // Campo de input (nome do jogador)
             DrawText(inputPlayerName.c_str(), marginX, y, inputSize, YELLOW);
             int inputH = inputSize;
             y += inputH + (lineSpacing * 2);
 
-            // Instrução de voltar (na parte inferior, alinhada à margem)
             DrawText("Pressione B para voltar ao menu sem salvar", marginX, screenH - bottomMargin, 18, LIGHTGRAY);
         }
         else
         {
-            // Mensagem centralizada de "Score salvo!"
             const char *savedText = "Score salvo!";
             int savedW = MeasureText(savedText, subtitleSize);
             DrawText(savedText, screenW / 2 - savedW / 2, y, subtitleSize, GREEN);
             y += subtitleSize + 18;
 
-            // Ações disponíveis (centralizadas)
             const char *contText = "Pressione ENTER para reiniciar / continuar";
             int contW = MeasureText(contText, textSize);
             DrawText(contText, screenW / 2 - contW / 2, y, textSize, WHITE);
@@ -177,8 +178,7 @@ void DrawGameOverScreen(const bool &vitoria, const bool &allowSave, const bool &
     }
     else
     {
-        // Fase concluída (mensagens centralizadas)
-        const char *doneText = "Fase concluida!";
+        const char *doneText = "Fase concluída!";
         int doneW = MeasureText(doneText, subtitleSize);
         DrawText(doneText, screenW / 2 - doneW / 2, y, subtitleSize, GREEN);
         y += subtitleSize + 18;

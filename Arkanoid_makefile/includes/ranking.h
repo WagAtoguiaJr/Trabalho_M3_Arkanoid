@@ -1,5 +1,4 @@
-#ifndef RANKING_H
-#define RANKING_H
+#pragma once
 
 #include <string>
 #include <vector>
@@ -19,5 +18,3 @@ void DrawRankingScreen();
 
 void LoadRankingCSV(const char* filename, vector<RankEntry> &outList);
 void AppendRankingCSV(const char* filename, const RankEntry &entry);
-
-#endif // RANKING_H

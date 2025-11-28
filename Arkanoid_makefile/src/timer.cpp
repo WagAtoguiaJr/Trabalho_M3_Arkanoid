@@ -6,10 +6,9 @@
 
 using namespace std;
 
-// Variáveis internas do módulo
-static double g_timerAccum = 0.0;    // tempo acumulado quando parado
-static double g_timerStart = 0.0;    // GetTime() quando iniciou/retomou
-static bool   g_timerRunning = false; // se o timer está rodando
+static double g_timerAccum = 0.0;
+static double g_timerStart = 0.0;
+static bool   g_timerRunning = false;
 
 void StartTimer()
 {
@@ -43,7 +42,7 @@ double GetElapsedTime()
 string FormatTime(double seconds)
 {
     if (seconds < 0.0) seconds = 0.0;
-    int totalMs = (int)std::round(seconds * 1000.0);
+    int totalMs = (int)round(seconds * 1000.0);
     int ms = totalMs % 1000;
     int totalSec = totalMs / 1000;
     int sec = totalSec % 60;

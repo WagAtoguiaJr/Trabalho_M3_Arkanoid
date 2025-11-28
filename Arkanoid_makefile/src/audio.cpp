@@ -1,7 +1,6 @@
 #include "audio.h"
 #include "raylib.h"
 
-// Arquivos de som (carregue os seus .wav/.ogg em res/)
 static Sound s_paddle_collision;
 static Sound s_block_collision;
 static Sound s_wall_collision;
@@ -23,8 +22,6 @@ void InitAudioSystem() {
 }
 
 void LoadAudioAssets() {
-    // Chame depois de InitAudioSystem, apenas uma vez
-    // Substitua os nomes pelos seus arquivos em res/
     s_paddle_collision = LoadSound("SFX/colisao_pad_SFX_.wav");
     s_block_collision = LoadSound("SFX/colisao_blco_SFX_.wav");
     s_wall_collision = LoadSound("SFX/colisao_SFX_.wav");
@@ -34,11 +31,8 @@ void LoadAudioAssets() {
     s_menu_navigate = LoadSound("SFX/navigate_SFX_.wav");
     s_menu_select = LoadSound("SFX/select_SFX_.wav");
 
-    // Música de fundo opcional
     bgm = LoadMusicStream("SFX/CMS_bgs.mp3");
     PlayMusicStream(bgm);
-
-    // Ajustes iniciais
     SetSoundVolume(s_paddle_collision, 0.6f);
     SetSoundVolume(s_block_collision, 0.6f);
     SetSoundVolume(s_wall_collision, 0.6f);
@@ -52,22 +46,18 @@ void LoadAudioAssets() {
 }
 
 void UpdateAudio() {
-    // Se estiver usando Music, atualize o stream no loop principal
     UpdateMusicStream(bgm);
 }
 
 void PlayPaddleCollisionSound() {
-    // PlaySound corta som em reprodução; PlaySoundMulti permite sobreposição
     PlaySound(s_paddle_collision);
 }
 
 void PlayBlockCollisionSound() {
-    // PlaySound corta som em reprodução; PlaySoundMulti permite sobreposição
     PlaySound(s_block_collision);
 }
 
 void PlayWallCollisionSound() {
-    // PlaySound corta som em reprodução; PlaySoundMulti permite sobreposição
     PlaySound(s_wall_collision);
 }
 
@@ -92,8 +82,6 @@ void PlayMenuSelectSound() {
 }
 
 void SetEffectsVolume(float vol) {
-    // Ajusta volume mestre para efeitos (não há função direta para todos os sounds,
-    // mas podemos ajustar individualmente se quiser)
     SetSoundVolume(s_paddle_collision, vol);
     SetSoundVolume(s_block_collision, vol);
     SetSoundVolume(s_wall_collision, vol);
@@ -109,7 +97,6 @@ void SetMusicVolume(float vol) {
 }
 
 void UnloadAudioSystem() {
-    // Descarrega assets e fecha dispositivo
     UnloadSound(s_paddle_collision);
     UnloadSound(s_block_collision);
     UnloadSound(s_wall_collision);

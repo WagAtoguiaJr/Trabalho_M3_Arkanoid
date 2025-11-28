@@ -1,22 +1,22 @@
-#include "objetos.h"
+#include "objects.h"
 #include "raylib.h"
 #include <cstdlib>
 
-void InicPaddle(Paddle &paddle, const Rectangle &playfield, int vidas)
+void InitPaddle(Paddle &paddle, const Rectangle &playfield, int vidas)
 {
     paddle.posicao = (Vector2) {(playfield.x + playfield.width/ 2), (playfield.y + playfield.height - 24.0f)};
     paddle.tamanho = (Vector2) {playfield.width / 8.0f, 20.0f};
     paddle.velocidade = 6.0f;
 }
 
-Bloco** InicBlocos(int linhas, int qtd, const Rectangle &playfield , Vector2 tamanho, int vidas)
+Brick** InitBricks(int linhas, int qtd, const Rectangle &playfield , Vector2 tamanho, int vidas)
 {
-    Bloco** blocos = new Bloco*[linhas];
+    Brick** blocos = new Brick*[linhas];
     // calcula margem superior para os blocos (por exemplo 8% do playfield height)
     float topMargin = playfield.y + 50.0f; // ou playfield.y + playfield.height * 0.05f;
     for (int i = 0; i < linhas; i++)
     {
-        blocos[i] = new Bloco[qtd];
+        blocos[i] = new Brick[qtd];
         for (int j = 0; j < qtd; j++)
         {
             // posição relativa dentro do playfield
@@ -34,13 +34,13 @@ Bloco** InicBlocos(int linhas, int qtd, const Rectangle &playfield , Vector2 tam
     return blocos;
 }
 
-void SetLifePowerUp(Bloco** blocos, int linhas, int qtd, int powerUps)
+void SetLifePowerUp(Brick** blocos, int linhas, int qtd, int powerUps)
 {
     if (powerUps == 0) return;
 
     int randomLinha = rand() % linhas;
     int randomColuna = rand() % qtd;
-    Bloco &b = blocos[randomLinha][randomColuna];
+    Brick &b = blocos[randomLinha][randomColuna];
     
     if (b.ativo && !b.lifePowerUp && !b.sizePowerUp && !b.velocPowerUp)
     {
@@ -55,13 +55,13 @@ void SetLifePowerUp(Bloco** blocos, int linhas, int qtd, int powerUps)
     SetLifePowerUp(blocos, linhas, qtd, powerUps - 1);
 }
 
-void SetSizePowerUp(Bloco** blocos, int linhas, int qtd, int powerUps)
+void SetSizePowerUp(Brick** blocos, int linhas, int qtd, int powerUps)
 {
     if (powerUps == 0) return;
     
     int randomLinha = rand() % linhas;
     int randomColuna = rand() % qtd;
-    Bloco &b = blocos[randomLinha][randomColuna];
+    Brick &b = blocos[randomLinha][randomColuna];
     
     if (b.ativo && !b.sizePowerUp && !b.lifePowerUp && !b.velocPowerUp)
     {
@@ -76,13 +76,13 @@ void SetSizePowerUp(Bloco** blocos, int linhas, int qtd, int powerUps)
    SetSizePowerUp(blocos, linhas, qtd, powerUps - 1);
 }
 
-void SetVelocPowerUp(Bloco** blocos, int linhas, int qtd, int powerUps)
+void SetVelocPowerUp(Brick** blocos, int linhas, int qtd, int powerUps)
 {
     if (powerUps == 0) return;
     
     int randomLinha = rand() % linhas;
     int randomColuna = rand() % qtd;
-    Bloco &b = blocos[randomLinha][randomColuna];
+    Brick &b = blocos[randomLinha][randomColuna];
     
     if (b.ativo && !b.velocPowerUp && !b.sizePowerUp && !b.lifePowerUp)
     {
@@ -97,7 +97,7 @@ void SetVelocPowerUp(Bloco** blocos, int linhas, int qtd, int powerUps)
    SetVelocPowerUp(blocos, linhas, qtd, powerUps - 1);
 }
 
-void InicBola(Bola &bola, Paddle &paddle, float raio)
+void InitBall(Ball &bola, Paddle &paddle, float raio)
 {
     bola.posicao = (Vector2) {paddle.posicao.x, paddle.posicao.y - raio - 1.0f};
     bola.raio = raio;

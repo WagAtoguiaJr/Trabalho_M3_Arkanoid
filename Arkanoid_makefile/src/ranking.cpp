@@ -8,8 +8,6 @@
 
 using namespace std;
 
-
-// Formato CSV: date;name;score;difficulty
 void LoadRankingCSV(const char* filename, vector<RankEntry> &outList)
 {
     outList.clear();
@@ -42,7 +40,6 @@ void AppendRankingCSV(const char* filename, const RankEntry &entry)
 {
     ofstream out(filename, ios::app);
     if (!out.is_open()) {
-        // tenta criar o arquivo
         out.open(filename, ios::out);
         if (!out.is_open()) return;
     }
@@ -50,13 +47,11 @@ void AppendRankingCSV(const char* filename, const RankEntry &entry)
     out.close();
 }
 
-// comparator: maior score primeiro, se empate maior difficulty primeiro, se empate data mais antiga primeiro
 static bool RankComparator(const RankEntry &a, const RankEntry &b)
 {
     if (a.score != b.score) return a.score > b.score;
     if (a.difficulty != b.difficulty) return a.difficulty > b.difficulty;
     if (a.timeSeconds != b.timeSeconds) return a.timeSeconds < b.timeSeconds;
-    // data mais antiga primeiro -> string YYYY-MM-DD, lexicographic funciona
     return a.date < b.date;
 }
 
